@@ -1,0 +1,51 @@
+[package]
+name = "ora-mcp"
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.89"
+description = "Oracle database MCP server (pure Rust, TNS/TTC protocol via ora_async)"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+bincode = "1"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+deadpool = "0.13.1"
+encoding_rs = "0.8.42"
+fs2 = "0.4.3"
+hex = "0.4"
+ora_async = { version = "1.0.0", path = "vendor/oracle_async" }
+rmcp = { version = "3.8.0", features = ["transport-io"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10.9"
+sqlparser = "0.63.0"
+thiserror = "2.0"
+tokio = { version = "1.54", features = ["rt-multi-thread", "macros", "sync", "time"] }
+tracing = "0.1.44"
+tracing-appender = "0.2.5"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
+# stdout 专用于 MCP JSON-RPC，禁止任何 print 宏污染协议流。
+# 日志统一走 logging.rs 的 stderr logger。
+[lints.clippy]
+print_stdout = "deny"
+print_stderr = "deny"
+dbg_macro = "deny"
+unwrap_used = "warn"
+expect_used = "warn"
+
+[profile.release]
+panic = "abort"
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+
+[workspace]
+members = [
+    ".",
+    "vendor/oracle_async",
+]
+
+[build-dependencies]
+serde_json = "1"

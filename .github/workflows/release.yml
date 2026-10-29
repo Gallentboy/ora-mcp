@@ -1,0 +1,139 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-matrix:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x86_64 (musl 静态单二进制，零 glibc 依赖)
+          - os: ubuntu-26.04
+            target: x86_64-unknown-linux-musl
+            artifact_name: ora-mcp-linux-x86_64.tar.gz
+            use_musl: true
+          # Linux ARM64 (musl 静态单二进制，GitHub 原生 ARM runner)
+          - os: ubuntu-26.04-arm
+            target: aarch64-unknown-linux-musl
+            artifact_name: ora-mcp-linux-aarch64.tar.gz
+            use_musl: true
+          # macOS Apple Silicon：M 芯片原生 runner 最新世代镜像，无交叉编译
+          - os: macos-26
+            target: aarch64-apple-darwin
+            artifact_name: ora-mcp-macos-aarch64.tar.gz
+          # macOS Intel：Intel 芯片专用原生 runner 最新世代镜像
+          - os: macos-26-intel
+            target: x86_64-apple-darwin
+            artifact_name: ora-mcp-macos-x86_64.tar.gz
+          # Windows x86_64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: ora-mcp-windows-x86_64.zip
+            is_windows: true
+          # Windows ARM64
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            artifact_name: ora-mcp-windows-aarch64.zip
+            is_windows: true
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # 关键步骤：在 CI/Release 构建中抹去本地 native CPU 约束（-C target-cpu=native），
+      # 确保产物能兼容所有通用 CPU，避免在其他人电脑上发生 SIGILL 崩溃。
+      - name: Strip native CPU flags for portable release
+        shell: bash
+        run: |
+          echo "GITHUB_ACTIONS detected: removing local native cpu flags"
+          rm -f .cargo/config.toml
+
+      # 安装 musl 编译工具（Linux 平台）
+      - name: Install musl tools
+        if: matrix.use_musl
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build release binary
+        shell: bash
+        run: |
+          cargo build --release --target ${{ matrix.target }}
+
+      - name: Package archive (Unix)
+        if: ${{ !matrix.is_windows }}
+        shell: bash
+        run: |
+          mkdir -p staging
+          cp target/${{ matrix.target }}/release/ora-mcp staging/
+          cp README.md staging/
+          tar -czvf ${{ matrix.artifact_name }} -C staging .
+
+      - name: Package archive (Windows)
+        if: matrix.is_windows
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path staging
+          Copy-Item target/${{ matrix.target }}/release/ora-mcp.exe staging/
+          Copy-Item README.md staging/
+          Compress-Archive -Path staging/* -DestinationPath ${{ matrix.artifact_name }}
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}
+          retention-days: 3
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create or Update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          # 提取 Tag 名称（如果是 manual 触发则取默认或输入）
+          TAG="${GITHUB_REF_NAME}"
+          if [[ "$TAG" != v* ]]; then
+            TAG="v1.0.0"
+          fi
+          echo "Publishing release for $TAG"
+
+          # 确保 release 存在，如果不存在则自动创建
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" release-assets/* \
+              --title "ora-mcp $TAG" \
+              --generate-notes
+          else
+            gh release upload "$TAG" release-assets/* --clobber
+          fi

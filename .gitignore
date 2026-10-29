@@ -1,0 +1,27 @@
+/target
+# AI coding 工具目录（自动添加）
+.zcode/
+.agents/
+.claude/
+.workbuddy/
+.cursor/
+.kilo/
+.codex/
+.aider/
+.continue/
+.windsurf/
+.copilot/
+.zed/
+.gemini/
+.droid/
+.factory/
+.goose/
+.roo/
+.cline/
+.trae/
+.DS_Store
+/vendor/oracle_async/target
+# 运行时连接配置与日志（严防误提交）
+.connections*
+mcp.log*
+*.tmp

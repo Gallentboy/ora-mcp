@@ -1,0 +1,4 @@
+# 本机 CPU 指令集优化（AVX/NEON 等）。
+# 注意：产物不可移植，只能在同代 CPU 的机器上运行；跨机器分发时去掉本文件或改用 -C target-cpu=x86-64-v2 之类的基线。
+[build]
+rustflags = ["-C", "target-cpu=native"]

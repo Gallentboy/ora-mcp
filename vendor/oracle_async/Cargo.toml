@@ -1,0 +1,40 @@
+[package]
+name = "ora_async"
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.75"
+description = "Pure Rust native async Oracle client driver based on Tokio (TNS/TTC protocol)"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+tokio = { version = "1", features = ["net", "io-util", "sync", "time", "macros", "rt"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+bytes = "1"
+async-trait = "0.1"
+futures-util = { version = "0.3", features = ["sink"] }
+thiserror = "1"
+log = "0.4"
+hex = "0.4"
+rand = "0.8"
+
+# Cryptography (pure Rust, no C bindings)
+sha2 = "0.10"
+sha1 = "0.10"
+hmac = "0.12"
+md-5 = "0.10"
+aes = "0.9"
+cbc = { version = "0.2", features = ["alloc", "block-padding"] }
+cipher = { version = "0.5", features = ["block-padding"] }
+des = "0.8"
+
+# Types & Values
+rust_decimal = "1"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+# ANO integrity 服务的 Diffie-Hellman 密钥协商（modpow on BigUint）
+num-bigint = "0.4"
+# Oracle 字符集转换（852=ZHS16GBK 等，真机中文数据 GBK 解码必需；
+# 版本 0.8 已是 app 依赖树传递项，零新增编译）
+encoding_rs = "0.8"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
